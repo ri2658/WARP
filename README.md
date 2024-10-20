@@ -12,4 +12,4 @@ This repository contains the code for the following:
   (YOLOv8 and RT-DETR) for wildfire smoke detection
 - Utility tools
 
-Regular updates, debugging, and optimization should be expected.
+Expect regular updates, debugging, and optimization!
