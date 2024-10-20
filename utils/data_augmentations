@@ -1,1 +1,95 @@
 
+import os
+import numpy as np
+from PIL import Image
+import cv2
+from concurrent.futures import ProcessPoolExecutor
+    
+def processImage(image_path, noise_path, output_dir, a):
+    # Load base and noise images using OpenCV (faster than PIL)
+    base_image = cv2.imread(image_path)
+    noise_image = cv2.imread(noise_path)
+
+    # Convert to float and normalize
+    base_image = base_image.astype(np.float32) / 255.0
+    noise_image = noise_image.astype(np.float32) / 255.0
+
+    # Resize noise image to match the base image size
+    noise_image = cv2.resize(noise_image, (base_image.shape[1], base_image.shape[0]))
+
+    # Calculate the standard deviation of the base image
+    s = np.std(base_image, dtype=np.float32)
+
+    # Apply the equation: (1-a) * base + a * s * noise
+    augmented_image = (1 - a) * base_image + a * s * noise_image
+
+    # Clip values to [0, 1] and convert back to uint8
+    augmented_image = np.clip(augmented_image, 0, 1) * 255
+    augmented_image = augmented_image.astype(np.uint8)
+
+    # Save the augmented image using OpenCV
+    output_path = os.path.join(output_dir, os.path.basename(image_path))
+    cv2.imwrite(output_path, augmented_image)
+
+def noiseOverlay(dataset_dir, noise_path, output_dir, a, max_workers=4):
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+
+    # List all images in the dataset directory, ignoring directories
+    image_paths = [os.path.join(dataset_dir, img) for img in os.listdir(dataset_dir)
+                   if os.path.isfile(os.path.join(dataset_dir, img))]
+
+    # Use ProcessPoolExecutor for parallel processing
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(processImage, image_path, noise_path, output_dir, a) for image_path in image_paths]
+        for future in futures:
+            future.result()  # Wait for all images to be processed
+
+    print("Data augmentation with noise overlay completed.")
+
+def process_image2(image_path, patched_image, overlay_size, overlay_position, output_dir):
+    # Load the base image with cv2 (in BGR format)
+    base_image = cv2.imread(image_path, cv2.IMREAD_COLOR)
+
+    # Resize the overlay image to the desired size
+    overlay_resized = cv2.resize(patched_image, overlay_size)
+
+    # Convert overlay to BGR (remove alpha if needed)
+    if overlay_resized.shape[2] == 4:  # If the overlay has an alpha channel
+        overlay_resized = overlay_resized[:, :, :3]
+
+    # Get the region of interest (ROI) in the base image
+    x, y = overlay_position
+    roi = base_image[y:y + overlay_size[1], x:x + overlay_size[0]]
+
+    # Blend the overlay with the ROI
+    blended = cv2.addWeighted(roi, 1, overlay_resized, 1, 0)
+
+    # Place the blended region back into the base image
+    base_image[y:y + overlay_size[1], x:x + overlay_size[0]] = blended
+
+    # Save the augmented image
+    output_path = os.path.join(output_dir, os.path.basename(image_path))
+    cv2.imwrite(output_path, base_image)
+
+    return output_path
+
+def noisePatch(dataset_dir, output_dir, patch_path, overlay_size, overlay_position, num_workers=4):
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+
+    # List all images in the dataset directory, ignoring directories
+    image_paths = [os.path.join(dataset_dir, img) for img in os.listdir(dataset_dir)
+                   if os.path.isfile(os.path.join(dataset_dir, img))]
+
+    # Load the patched image once (RGBA format) and convert to BGR
+    patched_image = cv2.imread(patch_path, cv2.IMREAD_UNCHANGED)
+    if patched_image.shape[2] == 4:  # If the overlay has an alpha channel
+        patched_image = patched_image[:, :, :3]  # Remove alpha
+
+    # Process images in parallel using ProcessPoolExecutor
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = [executor.submit(process_image2, image_path, patched_image, overlay_size, overlay_position, output_dir)
+                   for image_path in image_paths]
+
+    print("Data augmentation completed.")
