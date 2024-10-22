@@ -16,5 +16,5 @@ This repository contains the code for the following:
 Expect regular updates, debugging, and optimization!
 
 ## Contact
-ideryoryo@gmail.com 
+ideryoryo@gmail.com \\
 www.linkedin.com/in/ryo-ide-76703730a
