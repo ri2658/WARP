@@ -1,7 +1,7 @@
 # WARP
 
 ## Description
-This is **WARP** (**W**ildfire **A**dversarial **R**obustness **P**rotocol),
+This is **WARP** (**W**ildfire **A**dversarial **R**obustness **P**rocedure),
 the official code repository for the paper "Adversarial Robustness for Deep Learning-based Wildfire
 Prediction Models.
 
