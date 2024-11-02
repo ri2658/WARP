@@ -15,7 +15,7 @@ This repository contains the code for the following:
 
 Expect regular updates, debugging, and optimization!
 
-(Paper can be found here)[https://drive.google.com/file/d/1t7L7RAxmjyAEWlzqWxD9Tc654U3FZHw7/view?usp=drive_link]
+[Paper can be found here](https://drive.google.com/file/d/1t7L7RAxmjyAEWlzqWxD9Tc654U3FZHw7/view?usp=drive_link)
 
 ## Contact
 ideryoryo@gmail.com \\
