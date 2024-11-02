@@ -4,26 +4,25 @@ warnings.filterwarnings('ignore')
 warnings.simplefilter('ignore')
 import shutil
 from _utils.iou_xywh import iou
-from _utils.data_augmentations import *
+from _utils.data_augmentations import mutate_data, random_noise_patch
 import os
 import pandas as pd
 import time
-import numpy as np
 
 time_start_abs = time.time()
 
 # Mutate data (specialized data augmentation)
 _dataset_dir = DATASET_PATH
-_patch_path = PATCH_PATH
+_overlay_path = OVERLAY_PATH
 _output_dir = OUTPUT_PATH
-_model_path = MODEL_PATH
+_model_path
 
 # Define the overlay mutation properties
 _overlay_size = (25, 25)
 _a = 0.5
 
 # Initialize model and dataframe
-model = YOLO(_model_path)
+model = YOLO(MODEL_PATH)
 
 # Iterate over a grid of positions
 grid_size = 25
@@ -36,26 +35,22 @@ os.makedirs(results_path, exist_ok=True)
 os.chdir(results_path)
 
 # Initialize dataframe to store detections
-imageList = [img for img in os.listdir(_dataset_dir) if ".ipynb_checkpoints" not in img] # exclude .ipynb_checkpoints
-imageList.sort()
-length = len(imageList)
+imagelist = [img for img in os.listdir(_dataset_dir) if ".ipynb_checkpoints" not in img] # exclude .ipynb_checkpoints
+imagelist.sort()
+detections = pd.DataFrame(columns=['image_id', 'bbox', 'affected'])
+detections['affected'] = [0] * (len(imagelist))
+detections['image_id'] = imagelist
 
-detections = pd.DataFrame(columns=['deceptions'])
-A = np.zeros(shape=(grid_size,grid_size), dtype=int)
-
-detections['image_id'] = imageList
-detections['bbox'] = None
-
-for i in range(grid_size):    
+for i in range(grid_size):
 
     for j in range(grid_size):
         time_start = time.time()
-        
+
         # Initialize 'detectlist' to avoid length mismatch
-        detectList = []
+        detectlist = []
         
         # Calculate the overlay position for this slot
-        _overlay_position = (j * slot_width, i * slot_height)
+        _overlay_position = (j*slot_width, i*slot_height)
 
         # Initialize overlay mutation bbox coordinates
         bbox_mutation = [
@@ -66,9 +61,8 @@ for i in range(grid_size):
         ]
 
         # Perform the data augmentation
-        # noise_patch(_dataset_dir, _output_dir, _patch_path, _overlay_size, _overlay_position, 15)
-        mutate_data(_dataset_dir, _output_dir, _patch_path, _overlay_size, _overlay_position)
-
+        # mutate_data(_dataset_dir, _overlay_path, _output_dir, _overlay_size, _overlay_position)
+        random_noise_patch(_dataset_dir, _output_dir, _overlay_size, _overlay_position, _a, 0, 1, 15)
 
         # Record predictions
         results = model.predict(_output_dir, conf=0.01, iou=0.10, imgsz=640, max_det=1, verbose=False, stream=True)
@@ -77,23 +71,19 @@ for i in range(grid_size):
         for result in results:
             boxes = result.boxes
             if len(result.boxes.xywh.cpu().tolist()) == 0:
-                detectList.append([])
+                detectlist.append([])
             else:
-                detectList.append(boxes.xywh.cpu().tolist()[0])
+                detectlist.append(boxes.xywh.cpu().tolist()[0])
 
-        detections['bbox'] = detectList
+        detections['bbox'] = detectlist
 
         # Count how many detections were affected by overlay mutation
-        affected_count = 0
         for m in range(len(detections)):
             _iou = 0.0
             if len(detections.loc[m, 'bbox']) != 0:
                 _iou = iou(detections.loc[m, 'bbox'], bbox_mutation)
                 if _iou > 0.50:
-                    affected_count += 1
-
-        # Save results inside the i_dir directory
-        A[i][j] = affected_count
+                    detections.loc[m, 'affected'] += 1
 
         # Paths to the old file and the new file
         shutil.rmtree(_output_dir)
@@ -101,7 +91,12 @@ for i in range(grid_size):
 
         print(f'Iteration ({i},{j}) completed in {round(time.time() - time_start,2)} seconds.')
         print(f'{round((time.time() - time_start_abs)/60,2)} minutes elapsed.')
-        
-np.savetxt('yolov8_results_2.csv', A, delimiter=',')
 
-print('All iterations completed.')
+detections['p_i'] = 0.0
+
+for n in range(len(detections)):
+    detections.loc[n, 'p_i'] = detections.loc[n, 'affected'] / (grid_size ** 2)
+
+detections.to_csv('yolov8_p_iou_0_50.csv', index=False)
+
+print(f'All iterations completed. Results saved in directory \'{results_path}\'.')
