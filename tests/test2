@@ -1,0 +1,79 @@
+import ultralytics
+from ultralytics import YOLO
+import warnings
+warnings.filterwarnings('ignore')
+warnings.simplefilter('ignore')
+import shutil
+from _utils.data_augmentations import mutate_random_noise, noise_overlay
+import os
+import time
+
+time_start_abs = time.time()
+
+# Mutate data (specialized data augmentation)
+_dataset_dir = DATASET_PATH
+_output_dir = OUTPUT_PATH
+_noise_path = NOISE_PATH
+_model_path = MODEL_PATH
+_yaml_path = YAML_PATH
+_aug_yaml_path = AUG_YAML_PATH
+
+# Initialize model and dataframe
+model = YOLO(_model_path)
+
+# Check initial metrics
+print('Checking initial accuracy metrics.')
+metrics_orig = model.val(data=_yaml_path,
+                    imgsz=640,
+                    conf=0.01,
+                    iou=0.10,
+                    half=True,
+                    device='[0,1,2,3]',
+                    max_det=1,
+                    verbose=False)
+
+map_orig = metrics_orig.box.map
+map50_orig = metrics_orig.box.map50
+
+results_path = 'results'
+os.makedirs(results_path, exist_ok=True)
+os.chdir(results_path)
+
+_a = 0.0
+step_size = 0.001
+
+for i in range(1,501):
+    time_start = time.time()
+
+    noise_overlay(dataset_dir=_dataset_dir,
+                  noise_path=_noise_path,
+                  output_dir=_output_dir,
+                  a=_a
+                 )
+    
+    metrics = model.val(data=AUG_YAML_PATH,
+                        imgsz=640,
+                        conf=0.01,
+                        iou=0.10,
+                        half=True,
+                        device='[0,1,2,3]',
+                        max_det=1,
+                        verbose=False)
+    
+    map50_down_percentage = (metrics.box.map50 - map50_orig)/map50_orig
+    map_down_percentage = (metrics.box.map - map_orig)/map_orig
+
+    _a += step_size
+
+    # Save results inside the i_dir directory
+    with open(f'iter_{i}.txt', 'x') as file:
+        file.write(str(map50_down_percentage) + '\n' + str(map_down_percentage))
+
+    # Paths to the old file and the new file
+    shutil.rmtree(_output_dir)
+    shutil.copytree(_dataset_dir, _output_dir)
+
+    print(f'Iteration {i} completed in {round((time.time() - time_start),2)} seconds.')
+    print(f'{round((time.time() - time_start_abs)/60,2)} minutes elapsed.')
+
+print(f'All iterations completed. Results saved in directory \'{results_path}\'.')
