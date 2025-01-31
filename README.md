@@ -15,7 +15,7 @@ This repository contains the code for the following:
 
 Expect regular updates, debugging, and optimization!
 
-[Official Paper found here!](https://drive.google.com/file/d/1zwM2MbqPu5_rQvzX__4KDXSzX3peFrXt/view?usp=sharing)
+[Official Paper found here!](https://www.mdpi.com/2571-6255/8/2/50)
 
 ## Contact
 ideryoryo@gmail.com \\
